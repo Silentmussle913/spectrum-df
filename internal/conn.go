@@ -102,6 +102,7 @@ func NewConn(log *slog.Logger, conn io.ReadWriteCloser, authenticator Authentica
 		_ = c.Close()
 		return nil, err
 	}
+	c.log.Info("received backend connection request")
 
 	connectionRequest, _ := connectionRequestPacket.(*packet2.ConnectionRequest)
 
@@ -138,6 +139,7 @@ func NewConn(log *slog.Logger, conn io.ReadWriteCloser, authenticator Authentica
 		_ = c.Close()
 		return nil, err
 	}
+	c.log.Info("sent backend connection response", "initial_connection", c.initialConnection, "client_protocol", c.clientProtocol)
 
 	return c, nil
 }
@@ -348,6 +350,7 @@ func (c *Conn) ClientPacketLossPercentage() float64 {
 
 // StartGameContext ...
 func (c *Conn) StartGameContext(_ context.Context, data minecraft.GameData) (err error) {
+	c.log.Info("starting backend start-game sequence", "world", data.WorldName)
 	for _, item := range data.Items {
 		if item.Name == "minecraft:shield" {
 			c.shieldID = int32(item.RuntimeID)
@@ -397,26 +400,32 @@ func (c *Conn) StartGameContext(_ context.Context, data minecraft.GameData) (err
 	if err = c.WritePacket(startGame); err != nil {
 		return err
 	}
+	c.log.Info("queued start game packet")
 
 	if err = c.WritePacket(&packet.ItemRegistry{Items: data.Items}); err != nil {
 		return err
 	}
+	c.log.Info("queued item registry packet")
 
 	if _, err = c.expect(packet.IDRequestChunkRadius); err != nil {
 		return err
 	}
+	c.log.Info("received request chunk radius")
 
 	if err := c.WritePacket(&packet.ChunkRadiusUpdated{ChunkRadius: int32(c.ChunkRadius())}); err != nil {
 		return err
 	}
+	c.log.Info("queued chunk radius updated", "chunk_radius", c.ChunkRadius())
 
 	if err := c.WritePacket(&packet.PlayStatus{Status: packet.PlayStatusLoginSuccess}); err != nil {
 		return err
 	}
+	c.log.Info("queued play status login success")
 
 	if _, err = c.expect(packet.IDSetLocalPlayerAsInitialised); err != nil {
 		return err
 	}
+	c.log.Info("received set local player as initialised")
 	return
 }
 
